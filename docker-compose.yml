@@ -3,7 +3,7 @@ services:
     build: .
     container_name: invoice-ocr
     ports:
-      - "8999:5000"
+      - "8999:8999"
     volumes:
       # 可选：挂载本地目录存放上传文件（持久化）
       - ./uploads:/tmp/uploads

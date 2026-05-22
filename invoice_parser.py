@@ -17,7 +17,7 @@ def get_ocr():
     if _ocr_instance is None:
         with _ocr_lock:
             if _ocr_instance is None:
-                _ocr_instance = PaddleOCR(use_angle_cls=True, lang='ch', show_log=False)
+                _ocr_instance = PaddleOCR(use_angle_cls=True, lang='ch')
     return _ocr_instance
 
 
