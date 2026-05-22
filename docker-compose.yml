@@ -1,0 +1,20 @@
+services:
+  invoice-ocr:
+    build: .
+    container_name: invoice-ocr
+    ports:
+      - "8999:5000"
+    volumes:
+      # 可选：挂载本地目录存放上传文件（持久化）
+      - ./uploads:/tmp/uploads
+    environment:
+      - FLASK_ENV=production
+    restart: unless-stopped
+    # 如果需要 GPU 加速 PaddleOCR，取消下面注释
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - driver: nvidia
+    #           count: 1
+    #           capabilities: [gpu]
