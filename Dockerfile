@@ -24,5 +24,5 @@ COPY . .
 
 EXPOSE 8999
 
-# gunicorn 生产模式：--preload 预加载 OCR 模型共享内存，2 worker，超时 300s
-CMD ["gunicorn", "--bind", "0.0.0.0:8999", "--workers", "2", "--timeout", "300", "--preload", "app:app"]
+# gunicorn 生产模式：取消 --preload 避免 fork 与 paddle 冲突，1 worker 节约内存，超时 300s
+CMD ["gunicorn", "--bind", "0.0.0.0:8999", "--workers", "1", "--timeout", "300", "app:app"]

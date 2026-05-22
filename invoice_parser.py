@@ -31,7 +31,7 @@ def ocr_image(image):
     """对单张图片进行 OCR 识别，返回带位置信息的文本"""
     ocr = get_ocr()
     img_array = np.array(image)
-    results = ocr.ocr(img_array, cls=True)
+    results = ocr.ocr(img_array)
 
     text_blocks = []
     if results and results[0]:
