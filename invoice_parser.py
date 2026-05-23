@@ -1,340 +1,212 @@
-import re
 import os
-import threading
-import numpy as np
+import io
+import json
+import base64
+import logging
+import re
 from pdf2image import convert_from_path
-from paddleocr import PaddleOCR
+from openai import OpenAI
 
+logger = logging.getLogger(__name__)
 
-# 全局 OCR 实例，避免重复加载模型（线程安全）
-_ocr_instance = None
-_ocr_lock = threading.Lock()
+# 获取 LLM 环境变量，支持自定义 Base URL 接入大厂或者本地模型
+API_KEY = os.environ.get("OPENAI_API_KEY", "<你的阿里云API_KEY>")
+BASE_URL = os.environ.get("OPENAI_BASE_URL", "https://dashscope.aliyuncs.com/compatible-mode/v1")
+MODEL_NAME = os.environ.get("LLM_MODEL_NAME", "qwen-vl-plus")
 
+def get_llm_client():
+    return OpenAI(
+        api_key=API_KEY,
+        base_url=BASE_URL if BASE_URL else None
+    )
 
-def get_ocr():
-    """获取或创建 PaddleOCR 实例（单例，线程安全）"""
-    global _ocr_instance
-    if _ocr_instance is None:
-        with _ocr_lock:
-            if _ocr_instance is None:
-                _ocr_instance = PaddleOCR(use_angle_cls=True, lang='ch')
-    return _ocr_instance
-
-
-def pdf_to_images(pdf_path, dpi=300):
-    """将 PDF 转换为图片列表"""
-    images = convert_from_path(pdf_path, dpi=dpi)
-    return images
-
-
-def ocr_image(image):
-    """对单张图片进行 OCR 识别，返回带位置信息的文本"""
-    ocr = get_ocr()
-    img_array = np.array(image)
-    results = ocr.ocr(img_array)
-
-    text_blocks = []
-    if results and results[0]:
-        for line in results[0]:
-            box = line[0]  # [[x1,y1],[x2,y2],[x3,y3],[x4,y4]]
-            text = line[1][0]
-            confidence = line[1][1]
-            # 计算中心坐标
-            cx = sum(p[0] for p in box) / 4
-            cy = sum(p[1] for p in box) / 4
-            # 计算边界
-            min_x = min(p[0] for p in box)
-            max_x = max(p[0] for p in box)
-            min_y = min(p[1] for p in box)
-            max_y = max(p[1] for p in box)
-            text_blocks.append({
-                'text': text,
-                'confidence': confidence,
-                'cx': cx,
-                'cy': cy,
-                'min_x': min_x,
-                'max_x': max_x,
-                'min_y': min_y,
-                'max_y': max_y,
-                'box': box
-            })
-    return text_blocks
-
-
-def find_text_near(blocks, keyword, direction='right', max_distance=500):
-    """在关键字附近查找文本"""
-    keyword_block = None
-    for b in blocks:
-        if keyword in b['text']:
-            keyword_block = b
-            break
-    if not keyword_block:
-        return None
-
-    candidates = []
-    for b in blocks:
-        if b is keyword_block:
-            continue
-        if direction == 'right':
-            # 在右侧，且 Y 坐标相近
-            if (b['min_x'] > keyword_block['max_x'] - 20 and
-                    abs(b['cy'] - keyword_block['cy']) < 40 and
-                    b['min_x'] - keyword_block['max_x'] < max_distance):
-                candidates.append((b['min_x'] - keyword_block['max_x'], b))
-        elif direction == 'below':
-            # 在下方，且 X 坐标相近
-            if (b['min_y'] > keyword_block['max_y'] - 20 and
-                    abs(b['cx'] - keyword_block['cx']) < 100 and
-                    b['min_y'] - keyword_block['max_y'] < max_distance):
-                candidates.append((b['min_y'] - keyword_block['max_y'], b))
-
-    if candidates:
-        candidates.sort(key=lambda x: x[0])
-        return candidates[0][1]['text']
-    return None
-
-
-def extract_amount(text):
-    """从文本中提取金额数字"""
-    if not text:
-        return ''
-    # 去除 ¥ 符号和空格
-    text = text.replace('¥', '').replace('￥', '').replace(',', '').replace(' ', '')
-    # 匹配数字（含负数和小数）
-    match = re.search(r'-?[\d]+\.?\d*', text)
-    if match:
-        return match.group()
-    return text
-
-
-def determine_invoice_type(blocks):
-    """根据发票标题判断发票类型"""
-    full_text = ' '.join(b['text'] for b in blocks)
-
-    if '增值税专用发票' in full_text or '专用发票' in full_text:
-        if '电子' in full_text:
-            return '电子专票'
-        return '增值税专用发票'
-    elif '增值税普通发票' in full_text or '普通发票' in full_text:
-        if '电子' in full_text:
-            return '电子普票'
-        return '增值税普通发票'
-    elif '电子发票' in full_text:
-        # 检查更多上下文
-        if '专用' in full_text:
-            return '电子专票'
-        return '电子普票'
-
-    return '未知类型'
-
-
-def extract_invoice_number(blocks):
-    """提取发票号码 —— 匹配20位数电发票号或传统8位号码"""
-    full_text = ' '.join(b['text'] for b in blocks)
-
-    # 先找 "发票号码" 关键字附近的内容
-    number_text = find_text_near(blocks, '发票号码', 'right', max_distance=600)
-    if number_text:
-        # 提取连续数字
-        numbers = re.findall(r'\d{8,}', number_text)
-        if numbers:
-            return numbers[0]
-
-    # 全文搜索20位数字（数电发票号）
-    matches_20 = re.findall(r'\d{20}', full_text)
-    if matches_20:
-        return matches_20[0]
-
-    # 全文搜索8位数字
-    matches_8 = re.findall(r'\d{8}', full_text)
-    if matches_8:
-        return matches_8[0]
-
-    return ''
-
-
-def extract_date(blocks):
-    """提取开票日期"""
-    # 方法1：找 "开票日期" 关键字附近
-    date_text = find_text_near(blocks, '开票日期', 'right', max_distance=600)
-    if date_text:
-        # 尝试提取 YYYY年MM月DD日 或 YYYY-MM-DD 格式
-        match = re.search(r'(\d{4})\s*年\s*(\d{1,2})\s*月\s*(\d{1,2})\s*日', date_text)
-        if match:
-            return f"{match.group(1)}-{match.group(2).zfill(2)}-{match.group(3).zfill(2)}"
-        match = re.search(r'(\d{4}[-/]\d{1,2}[-/]\d{1,2})', date_text)
-        if match:
-            return match.group(1)
-
-    # 方法2：全文搜索日期
-    full_text = ' '.join(b['text'] for b in blocks)
-    match = re.search(r'(\d{4})\s*年\s*(\d{1,2})\s*月\s*(\d{1,2})\s*日', full_text)
-    if match:
-        return f"{match.group(1)}-{match.group(2).zfill(2)}-{match.group(3).zfill(2)}"
-
-    return ''
-
-
-def extract_supplier_name(blocks):
-    """提取销售方/供应商名称"""
-    # 方法1：找 "销售方" 或 "销" 下面的 "名称" 后面的内容
-    for i, b in enumerate(blocks):
-        if '销售方' in b['text'] or ('销' in b['text'] and '方' in b['text']):
-            # 找附近的 "名称" 块
-            for b2 in blocks:
-                if '名称' in b2['text'] and abs(b2['cy'] - b['cy']) < 80:
-                    # 在名称后面找公司名
-                    name_text = find_text_near(blocks, '名称', 'right', max_distance=800)
-                    # 可能名称和值在同一个文本块里
-                    if b2['text'] and ':' in b2['text']:
-                        parts = b2['text'].split(':')
-                        if len(parts) > 1 and parts[1].strip():
-                            return parts[1].strip()
-                    if b2['text'] and '：' in b2['text']:
-                        parts = b2['text'].split('：')
-                        if len(parts) > 1 and parts[1].strip():
-                            return parts[1].strip()
-                    if name_text and '名称' not in name_text:
-                        return name_text.replace(':', '').replace('：', '').strip()
-
-    # 方法2：全文搜索包含 "公司" 的文本，取销售方区域的
-    # 在页面右半区域找包含 "公司" 的文本
-    company_blocks = [b for b in blocks if '公司' in b['text'] or '有限' in b['text']]
-
-    if company_blocks:
-        # 找到 "销" 字的位置来确定销售方区域
-        sell_blocks = [b for b in blocks if '销' in b['text'] and ('方' in b['text'] or '售' in b['text'])]
-        if sell_blocks:
-            sell_y = sell_blocks[0]['cy']
-            # 在销售方区域的公司名
-            nearby = [b for b in company_blocks if abs(b['cy'] - sell_y) < 80]
-            if nearby:
-                name = nearby[0]['text']
-                # 清理前缀
-                name = re.sub(r'^.*?名称[：:]?\s*', '', name)
-                return name.strip()
-
-    # 方法3: 查找 "名称:" 模式
-    for b in blocks:
-        text = b['text']
-        match = re.search(r'名称[：:]\s*(.+(?:公司|企业|集团|工厂|商行|商店))', text)
-        if match:
-            return match.group(1).strip()
-
-    return ''
-
-
-def extract_amounts(blocks):
-    """提取合计金额和税额"""
-    amount = ''
-    tax = ''
-    total = ''
-
-    # 找 "合计" 行
-    for i, b in enumerate(blocks):
-        if b['text'].strip() == '合计' or ('合' in b['text'] and '计' in b['text'] and '价税' not in b['text'] and len(b['text']) <= 4):
-            # 在合计行右侧找金额
-            row_blocks = [b2 for b2 in blocks
-                          if abs(b2['cy'] - b['cy']) < 30
-                          and b2['min_x'] > b['max_x'] - 20
-                          and b2 is not b]
-            row_blocks.sort(key=lambda x: x['min_x'])
-
-            amounts = []
-            for rb in row_blocks:
-                amt = extract_amount(rb['text'])
-                if amt and re.match(r'-?[\d.]+$', amt):
-                    amounts.append(amt)
-
-            if len(amounts) >= 2:
-                amount = amounts[-2]  # 倒数第二个是金额
-                tax = amounts[-1]     # 最后一个是税额
-            elif len(amounts) == 1:
-                amount = amounts[0]
-            break
-
-    # 找 "价税合计" 行
-    for b in blocks:
-        if '价税合计' in b['text']:
-            # 在右侧找金额
-            row_blocks = [b2 for b2 in blocks
-                          if abs(b2['cy'] - b['cy']) < 30
-                          and b2['min_x'] > b['max_x'] - 50
-                          and b2 is not b]
-            row_blocks.sort(key=lambda x: x['min_x'])
-
-            for rb in row_blocks:
-                text = rb['text']
-                # 匹配 (小写) ¥xxx 格式
-                match = re.search(r'[¥￥]\s*([\d,.]+)', text)
-                if match:
-                    total = match.group(1).replace(',', '')
-                    break
-                # 匹配纯数字
-                amt = extract_amount(text)
-                if amt and re.match(r'-?[\d.]+$', amt):
-                    total = amt
-                    break
-            break
-
-    # 如果只有合计没有找到单独金额和税额，尝试其他方式
-    if not amount:
-        for b in blocks:
-            if '金额' in b['text'] and '税' not in b['text'] and '价' not in b['text']:
-                amt_text = find_text_near(blocks, '金额', 'right')
-                if amt_text:
-                    amount = extract_amount(amt_text)
-                break
-
-    return amount, tax, total
-
+def encode_image(image):
+    """将 PIL Image 转为 Base64 字符串"""
+    buffered = io.BytesIO()
+    image = image.convert("RGB")
+    image.save(buffered, format="JPEG")
+    return base64.b64encode(buffered.getvalue()).decode('utf-8')
 
 def parse_invoice(pdf_path):
-    """解析单个发票 PDF，返回结构化数据"""
+    """使用 LLM Vision 模型解析结构数据"""
+    if not API_KEY or API_KEY == "<你的阿里云API_KEY>":
+        return {'error': '未配置正确的 OPENAI_API_KEY 环境变量，无法调用 LLM。'}
+
     try:
-        images = pdf_to_images(pdf_path)
+        images = convert_from_path(pdf_path, dpi=200)
     except Exception as e:
         return {'error': f'PDF 转图片失败: {str(e)}'}
 
     if not images:
         return {'error': 'PDF 页面为空'}
 
-    # 通常发票只有1页，取第一页
+    # 仅使用第一页
     image = images[0]
-    blocks = ocr_image(image)
+    base64_image = encode_image(image)
 
-    if not blocks:
-        return {'error': 'OCR 识别失败，未检测到文本'}
+    client = get_llm_client()
 
-    # 提取各字段
-    invoice_date = extract_date(blocks)
-    invoice_type = determine_invoice_type(blocks)
-    invoice_number = extract_invoice_number(blocks)
-    supplier_name = extract_supplier_name(blocks)
-    amount, tax, total = extract_amounts(blocks)
+    prompt = '''你是一个专业的发票识别助手。请识别这张发票图片中的信息。
 
-    # 判断有效抵扣税额
-    deductible_tax = ''
-    if tax:
-        if '专' in invoice_type:
-            deductible_tax = tax  # 专票可抵扣
-        else:
-            deductible_tax = '0'  # 普票不可抵扣
+【极其重要的输出要求】
+1. 只能输出一个合法的 JSON 对象，不要输出任何其他内容。
+2. 禁止使用 Markdown 格式，禁止使用 ```json 或 ``` 包裹，禁止使用任何代码块标记。
+3. 禁止输出任何分析、解释、说明、注释性文字。
+4. 直接以 { 开头，以 } 结尾，中间是 JSON 内容。
+5. JSON 的键名必须严格遵守下面的中文名称，不要使用英文键名！
 
-    result = {
-        '发票日期': invoice_date,
-        '发票类型': invoice_type,
-        '发票号码': invoice_number,
-        '数电发票号码': invoice_number,  # 数电票号码与发票号码相同
-        '供应商名称': supplier_name,
-        '金额': amount,
-        '税额': tax,
-        '有效抵扣税额': deductible_tax,
-        '价税合计': total,
+请返回包含以下固定键名的 JSON：
+- "发票日期"（格式为 YYYY-MM-DD）
+- "发票类型"（如：增值税专用发票、增值税普通发票、电子专票、电子普票等）
+- "发票号码"（或数电发票号码）
+- "供应商名称"（销售方名称）
+- "金额"（不含税金额，仅提取数字，无逗号）
+- "税额"（仅提取数字，无逗号）
+- "价税合计"（仅提取数字，无逗号）
+- "有效抵扣税额"（如果是专用发票，等于"税额"，否则等于"0"）
+'''
+    try:
+        response = client.chat.completions.create(
+            model=MODEL_NAME,
+            messages=[
+                {
+                    "role": "user",
+                    "content": [
+                        {"type": "text", "text": prompt},
+                        {
+                            "type": "image_url",
+                            "image_url": {
+                                "url": f"data:image/jpeg;base64,{base64_image}",
+                                "detail": "high"
+                            }
+                        }
+                    ]
+                }
+            ],
+            temperature=0.0
+        )
+        
+        result_text = response.choices[0].message.content.strip()
+        logger.info(f"LLM 原始响应:\n{result_text}")
+        
+        # 容错处理：提取纯 JSON 字符串
+        extracted_json = _extract_json(result_text)
+        if extracted_json is None:
+            logger.error(f"无法从 LLM 响应中提取 JSON，原始内容:\n{result_text[:500]}")
+            return {'error': 'LLM 返回内容中无法解析出 JSON，请重试'}
+        
+        try:
+            result_data = json.loads(extracted_json)
+        except json.JSONDecodeError:
+            # 二次容错：尝试修复常见问题（尾部多余逗号等）
+            cleaned = re.sub(r',\s*([}\]])', r'\1', extracted_json)
+            try:
+                result_data = json.loads(cleaned)
+            except json.JSONDecodeError as je:
+                logger.error(f"JSON 解析失败：{extracted_json[:500]}")
+                return {'error': f'JSON解析失败，大模型返回格式不合法: {str(je)}'}
+        
+        # 为了更好地兼容大模型可能返回的其他键名进行容错获取
+        result = _normalize_keys(result_data)
+        logger.info(f"解析结果: {result}")
+        return result
+    except json.JSONDecodeError as je:
+        logger.error(f"JSON 解析失败：{str(je)}")
+        return {'error': f'JSON解析失败，大模型返回格式不合法: {str(je)}'}
+    except Exception as e:
+        logger.error(f"LLM 识别出错: {e}")
+        return {'error': f'LLM 识别发生错误: {str(e)}'}
+
+
+def _extract_json(text):
+    """从 LLM 响应文本中提取纯 JSON 字符串，支持多种容错策略"""
+    # 策略1：去除 markdown 代码块标记后提取
+    cleaned = re.sub(r'```(?:json|JSON)?\s*', '', text)
+    cleaned = cleaned.replace('```', '').strip()
+    
+    # 策略2：用非贪婪正则匹配最外层 JSON 对象
+    match = re.search(r'\{[\s\S]*\}', cleaned)
+    if match:
+        candidate = match.group(0)
+        # 验证是否为合法 JSON
+        try:
+            json.loads(candidate)
+            return candidate
+        except json.JSONDecodeError:
+            pass
+    
+    # 策略3：在原始文本中直接查找 JSON
+    match = re.search(r'\{[\s\S]*\}', text)
+    if match:
+        candidate = match.group(0)
+        try:
+            json.loads(candidate)
+            return candidate
+        except json.JSONDecodeError:
+            pass
+    
+    # 策略4：逐字符查找匹配的 JSON 边界
+    start = text.find('{')
+    if start == -1:
+        return None
+    depth = 0
+    in_string = False
+    escape_next = False
+    for i in range(start, len(text)):
+        ch = text[i]
+        if escape_next:
+            escape_next = False
+            continue
+        if ch == '\\' and in_string:
+            escape_next = True
+            continue
+        if ch == '"' and not escape_next:
+            in_string = not in_string
+            continue
+        if in_string:
+            continue
+        if ch == '{':
+            depth += 1
+        elif ch == '}':
+            depth -= 1
+            if depth == 0:
+                candidate = text[start:i+1]
+                try:
+                    json.loads(candidate)
+                    return candidate
+                except json.JSONDecodeError:
+                    return None
+    return None
+
+
+def _normalize_keys(result_data):
+    """兼容大模型可能返回的中英文键名"""
+    # 中英文键名映射表
+    key_map = {
+        '发票日期': ['issue_date', 'date', '开票日期'],
+        '发票类型': ['invoice_type', 'type'],
+        '发票号码': ['invoice_number', 'invoice_no', 'number'],
+        '供应商名称': ['seller_name', 'seller', '销售方名称'],
+        '金额': ['amount', 'total_amount', 'total', '合计金额'],
+        '税额': ['tax_amount', 'tax', 'tax_total', '合计税额'],
+        '有效抵扣税额': ['deductible_tax', 'valid_tax'],
+        '价税合计': ['grand_total', 'total_with_tax', 'total_amount_with_tax', '价税合计小写'],
     }
-
+    
+    result = {}
+    for cn_key, en_keys in key_map.items():
+        value = result_data.get(cn_key, '')
+        if not value:
+            for en_key in en_keys:
+                value = result_data.get(en_key, '')
+                if value:
+                    break
+        result[cn_key] = value
+    
+    # 数电发票号码兼容
+    result['数电发票号码'] = result.get('发票号码', result_data.get('发票号码', ''))
+    
     return result
-
 
 def parse_multiple_invoices(pdf_paths):
     """批量解析多个发票 PDF"""

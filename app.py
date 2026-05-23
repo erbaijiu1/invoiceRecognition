@@ -1,5 +1,6 @@
 import os
 import io
+import sys
 import uuid
 import logging
 import tempfile
@@ -7,6 +8,18 @@ from flask import Flask, request, jsonify, send_file, send_from_directory
 from openpyxl import Workbook
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 from invoice_parser import parse_invoice
+
+# 修复 Windows 终端中文乱码问题
+if sys.platform == 'win32':
+    try:
+        os.system('chcp 65001 >nul 2>&1')
+    except Exception:
+        pass
+    # 确保 stdout/stderr 使用 UTF-8 编码
+    if hasattr(sys.stdout, 'reconfigure'):
+        sys.stdout.reconfigure(encoding='utf-8')
+    if hasattr(sys.stderr, 'reconfigure'):
+        sys.stderr.reconfigure(encoding='utf-8')
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s [%(levelname)s] %(message)s')
 logger = logging.getLogger(__name__)

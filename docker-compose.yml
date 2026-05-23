@@ -9,6 +9,11 @@ services:
       - ./uploads:/tmp/uploads
     environment:
       - FLASK_ENV=production
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - OPENAI_BASE_URL=${OPENAI_BASE_URL:-https://api.openai.com/v1}
+      - LLM_MODEL_NAME=${LLM_MODEL_NAME:-gpt-4o}
+    env_file:
+      - .env
     restart: unless-stopped
     # 如果需要 GPU 加速 PaddleOCR，取消下面注释
     # deploy:
