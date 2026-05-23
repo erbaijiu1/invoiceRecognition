@@ -4,6 +4,7 @@ import json
 import base64
 import logging
 import re
+from PIL import Image
 from pdf2image import convert_from_path
 from openai import OpenAI
 
@@ -14,11 +15,33 @@ API_KEY = os.environ.get("OPENAI_API_KEY", "<你的阿里云API_KEY>")
 BASE_URL = os.environ.get("OPENAI_BASE_URL", "https://dashscope.aliyuncs.com/compatible-mode/v1")
 MODEL_NAME = os.environ.get("LLM_MODEL_NAME", "qwen-vl-plus")
 
+# 支持的模型列表（前端下拉框使用）
+AVAILABLE_MODELS = [
+    {"id": "qwen-vl-plus", "name": "Qwen-VL-Plus（通义千问视觉）"},
+    {"id": "qwen-vl-max", "name": "Qwen-VL-Max（通义千问视觉旗舰）"},
+    {"id": "qwen-vl-ocr", "name": "Qwen-VL-OCR（OCR专用）"},
+    {"id": "qwen3.7-max", "name": "Qwen3.7-Max（新一代旗舰机器视觉）"},
+    {"id": "qwen3.6-plus", "name": "Qwen3.6-Plus（新一代主力机器视觉）"},
+    {"id": "qwen2.5-vl-72b-instruct", "name": "Qwen2.5-VL-72B"},
+    {"id": "qwen2.5-vl-32b-instruct", "name": "Qwen2.5-VL-32B"},
+    {"id": "qwen2.5-vl-7b-instruct", "name": "Qwen2.5-VL-7B"},
+]
+
+# 支持的图片格式
+SUPPORTED_IMAGE_EXTENSIONS = {'.jpg', '.jpeg', '.png', '.bmp', '.webp', '.tiff', '.tif'}
+
+
+def get_available_models():
+    """返回可用模型列表"""
+    return AVAILABLE_MODELS
+
+
 def get_llm_client():
     return OpenAI(
         api_key=API_KEY,
         base_url=BASE_URL if BASE_URL else None
     )
+
 
 def encode_image(image):
     """将 PIL Image 转为 Base64 字符串"""
@@ -27,26 +50,38 @@ def encode_image(image):
     image.save(buffered, format="JPEG")
     return base64.b64encode(buffered.getvalue()).decode('utf-8')
 
-def parse_invoice(pdf_path):
-    """使用 LLM Vision 模型解析结构数据"""
-    if not API_KEY or API_KEY == "<你的阿里云API_KEY>":
-        return {'error': '未配置正确的 OPENAI_API_KEY 环境变量，无法调用 LLM。'}
 
-    try:
-        images = convert_from_path(pdf_path, dpi=200)
-    except Exception as e:
-        return {'error': f'PDF 转图片失败: {str(e)}'}
+def encode_image_file(image_path):
+    """将图片文件直接读取并转为 Base64 字符串"""
+    with open(image_path, 'rb') as f:
+        return base64.b64encode(f.read()).decode('utf-8')
 
-    if not images:
-        return {'error': 'PDF 页面为空'}
 
-    # 仅使用第一页
-    image = images[0]
-    base64_image = encode_image(image)
+def _get_image_mime_type(file_path):
+    """根据文件扩展名获取 MIME 类型"""
+    ext = os.path.splitext(file_path)[1].lower()
+    mime_map = {
+        '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg',
+        '.png': 'image/png', '.bmp': 'image/bmp',
+        '.webp': 'image/webp', '.tiff': 'image/tiff', '.tif': 'image/tiff',
+    }
+    return mime_map.get(ext, 'image/jpeg')
 
-    client = get_llm_client()
 
-    prompt = '''你是一个专业的发票识别助手。请识别这张发票图片中的信息。
+def _build_image_content(base64_str, mime_type='image/jpeg'):
+    """构建 image_url 消息内容"""
+    return {
+        "type": "image_url",
+        "image_url": {
+            "url": f"data:{mime_type};base64,{base64_str}",
+            "detail": "high"
+        }
+    }
+
+
+def _get_invoice_prompt():
+    """返回发票识别的 prompt"""
+    return '''你是一个专业的发票识别助手。请识别这张发票图片中的信息。
 
 【极其重要的输出要求】
 1. 只能输出一个合法的 JSON 对象，不要输出任何其他内容。
@@ -65,57 +100,121 @@ def parse_invoice(pdf_path):
 - "价税合计"（仅提取数字，无逗号）
 - "有效抵扣税额"（如果是专用发票，等于"税额"，否则等于"0"）
 '''
+
+
+def parse_invoice(file_path, model_name=None):
+    """解析发票文件（支持 PDF 和图片格式）
+    
+    Args:
+        file_path: 文件路径（PDF 或图片）
+        model_name: 指定模型名称，不传则使用环境变量中的默认模型
+    """
+    if not API_KEY or API_KEY == "<你的阿里云API_KEY>":
+        return {'error': '未配置正确的 OPENAI_API_KEY 环境变量，无法调用 LLM。'}
+
+    ext = os.path.splitext(file_path)[1].lower()
+    
+    if ext == '.pdf':
+        return _parse_pdf_invoice(file_path, model_name)
+    elif ext in SUPPORTED_IMAGE_EXTENSIONS:
+        return _parse_image_invoice(file_path, model_name)
+    else:
+        return {'error': f'不支持的文件格式: {ext}，仅支持 PDF 和常见图片格式'}
+
+
+def _parse_image_invoice(image_path, model_name=None):
+    """解析图片格式的发票"""
+    base64_image = encode_image_file(image_path)
+    mime_type = _get_image_mime_type(image_path)
+    
+    client = get_llm_client()
+    prompt = _get_invoice_prompt()
+    use_model = model_name or MODEL_NAME
+
     try:
         response = client.chat.completions.create(
-            model=MODEL_NAME,
+            model=use_model,
             messages=[
                 {
                     "role": "user",
                     "content": [
                         {"type": "text", "text": prompt},
-                        {
-                            "type": "image_url",
-                            "image_url": {
-                                "url": f"data:image/jpeg;base64,{base64_image}",
-                                "detail": "high"
-                            }
-                        }
+                        _build_image_content(base64_image, mime_type)
                     ]
                 }
             ],
             temperature=0.0
         )
-        
-        result_text = response.choices[0].message.content.strip()
-        logger.info(f"LLM 原始响应:\n{result_text}")
-        
-        # 容错处理：提取纯 JSON 字符串
-        extracted_json = _extract_json(result_text)
-        if extracted_json is None:
-            logger.error(f"无法从 LLM 响应中提取 JSON，原始内容:\n{result_text[:500]}")
-            return {'error': 'LLM 返回内容中无法解析出 JSON，请重试'}
-        
-        try:
-            result_data = json.loads(extracted_json)
-        except json.JSONDecodeError:
-            # 二次容错：尝试修复常见问题（尾部多余逗号等）
-            cleaned = re.sub(r',\s*([}\]])', r'\1', extracted_json)
-            try:
-                result_data = json.loads(cleaned)
-            except json.JSONDecodeError as je:
-                logger.error(f"JSON 解析失败：{extracted_json[:500]}")
-                return {'error': f'JSON解析失败，大模型返回格式不合法: {str(je)}'}
-        
-        # 为了更好地兼容大模型可能返回的其他键名进行容错获取
-        result = _normalize_keys(result_data)
-        logger.info(f"解析结果: {result}")
-        return result
-    except json.JSONDecodeError as je:
-        logger.error(f"JSON 解析失败：{str(je)}")
-        return {'error': f'JSON解析失败，大模型返回格式不合法: {str(je)}'}
+        return _process_llm_response(response)
     except Exception as e:
         logger.error(f"LLM 识别出错: {e}")
         return {'error': f'LLM 识别发生错误: {str(e)}'}
+
+
+def _parse_pdf_invoice(pdf_path, model_name=None):
+    """解析 PDF 格式的发票（支持多页，所有页面发送给模型）"""
+    try:
+        images = convert_from_path(pdf_path, dpi=200)
+    except Exception as e:
+        return {'error': f'PDF 转图片失败: {str(e)}'}
+
+    if not images:
+        return {'error': 'PDF 页面为空'}
+
+    client = get_llm_client()
+    prompt = _get_invoice_prompt()
+    use_model = model_name or MODEL_NAME
+
+    # 构建多图消息内容（所有页面一起发送）
+    content = [{"type": "text", "text": prompt}]
+    
+    if len(images) == 1:
+        # 单页 PDF
+        base64_image = encode_image(images[0])
+        content.append(_build_image_content(base64_image, 'image/jpeg'))
+    else:
+        # 多页 PDF：所有页面作为多图输入
+        prompt_multi = prompt + '\n注意：此发票包含多页，请综合所有页面信息进行识别。'
+        content[0] = {"type": "text", "text": prompt_multi}
+        for img in images:
+            base64_image = encode_image(img)
+            content.append(_build_image_content(base64_image, 'image/jpeg'))
+
+    try:
+        response = client.chat.completions.create(
+            model=use_model,
+            messages=[{"role": "user", "content": content}],
+            temperature=0.0
+        )
+        return _process_llm_response(response)
+    except Exception as e:
+        logger.error(f"LLM 识别出错: {e}")
+        return {'error': f'LLM 识别发生错误: {str(e)}'}
+
+
+def _process_llm_response(response):
+    """处理 LLM 响应，提取并解析 JSON 结果"""
+    result_text = response.choices[0].message.content.strip()
+    logger.info(f"LLM 原始响应:\n{result_text}")
+
+    extracted_json = _extract_json(result_text)
+    if extracted_json is None:
+        logger.error(f"无法从 LLM 响应中提取 JSON，原始内容:\n{result_text[:500]}")
+        return {'error': 'LLM 返回内容中无法解析出 JSON，请重试'}
+
+    try:
+        result_data = json.loads(extracted_json)
+    except json.JSONDecodeError:
+        cleaned = re.sub(r',\s*([}\]])', r'\1', extracted_json)
+        try:
+            result_data = json.loads(cleaned)
+        except json.JSONDecodeError as je:
+            logger.error(f"JSON 解析失败：{extracted_json[:500]}")
+            return {'error': f'JSON解析失败，大模型返回格式不合法: {str(je)}'}
+
+    result = _normalize_keys(result_data)
+    logger.info(f"解析结果: {result}")
+    return result
 
 
 def _extract_json(text):

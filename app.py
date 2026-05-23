@@ -7,7 +7,7 @@ import tempfile
 from flask import Flask, request, jsonify, send_file, send_from_directory
 from openpyxl import Workbook
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
-from invoice_parser import parse_invoice
+from invoice_parser import parse_invoice, get_available_models, SUPPORTED_IMAGE_EXTENSIONS
 
 # 修复 Windows 终端中文乱码问题
 if sys.platform == 'win32':
@@ -38,9 +38,19 @@ def index():
     return send_from_directory('static', 'index.html')
 
 
+# 支持的文件格式
+SUPPORTED_EXTENSIONS = {'.pdf'} | SUPPORTED_IMAGE_EXTENSIONS
+
+
+@app.route('/api/models', methods=['GET'])
+def list_models():
+    """返回可用模型列表"""
+    return jsonify({'models': get_available_models()})
+
+
 @app.route('/api/upload', methods=['POST'])
 def upload_invoice():
-    """上传并识别发票 PDF"""
+    """上传并识别发票（支持 PDF 和图片格式）"""
     if 'files' not in request.files:
         return jsonify({'error': '没有上传文件'}), 400
 
@@ -48,24 +58,27 @@ def upload_invoice():
     if not files or files[0].filename == '':
         return jsonify({'error': '没有选择文件'}), 400
 
+    # 获取前端选择的模型
+    model_name = request.form.get('model', None)
+
     results = []
     for file in files:
-        if not file.filename.lower().endswith('.pdf'):
+        ext = os.path.splitext(file.filename)[1].lower()
+        if ext not in SUPPORTED_EXTENSIONS:
             results.append({
                 '文件名': file.filename,
-                'error': '仅支持 PDF 格式'
+                'error': f'不支持的文件格式: {ext}，仅支持 PDF 和常见图片格式（JPEG、PNG、BMP、WebP、TIFF）'
             })
             continue
 
         # 保存临时文件（用 UUID 避免并发冲突）
-        ext = os.path.splitext(file.filename)[1]
         safe_name = f"{uuid.uuid4().hex}{ext}"
         filepath = os.path.join(app.config['UPLOAD_FOLDER'], safe_name)
         file.save(filepath)
 
         try:
-            logger.info(f'开始识别: {file.filename}')
-            result = parse_invoice(filepath)
+            logger.info(f'开始识别: {file.filename} (模型: {model_name or "默认"})')
+            result = parse_invoice(filepath, model_name=model_name)
             result['文件名'] = file.filename
             results.append(result)
         except Exception as e:

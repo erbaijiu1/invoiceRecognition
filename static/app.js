@@ -19,10 +19,33 @@
     const resultsBody = document.getElementById('results-body');
     const resultCount = document.getElementById('result-count');
     const toastContainer = document.getElementById('toast-container');
+    const modelSelect = document.getElementById('model-select');
 
     // ===== State =====
     let selectedFiles = [];
     let recognitionResults = [];
+
+    // 支持的文件格式
+    const SUPPORTED_EXTENSIONS = ['.pdf', '.jpg', '.jpeg', '.png', '.bmp', '.webp', '.tiff', '.tif'];
+
+    // ===== Load Models =====
+    async function loadModels() {
+        try {
+            const res = await fetch('/api/models');
+            const data = await res.json();
+            modelSelect.innerHTML = '';
+            (data.models || []).forEach(m => {
+                const opt = document.createElement('option');
+                opt.value = m.id;
+                opt.textContent = m.name;
+                modelSelect.appendChild(opt);
+            });
+        } catch (e) {
+            console.error('加载模型列表失败:', e);
+            modelSelect.innerHTML = '<option value="">加载失败</option>';
+        }
+    }
+    loadModels();
 
     // ===== Toast =====
     function showToast(message, type = 'info', duration = 3500) {
@@ -47,8 +70,9 @@
     // ===== File Management =====
     function addFiles(files) {
         for (const file of files) {
-            if (!file.name.toLowerCase().endsWith('.pdf')) {
-                showToast(`${file.name} 不是 PDF 文件，已跳过`, 'error');
+            const ext = '.' + file.name.split('.').pop().toLowerCase();
+            if (!SUPPORTED_EXTENSIONS.includes(ext)) {
+                showToast(`${file.name} 格式不支持，已跳过`, 'error');
                 continue;
             }
             // 去重
@@ -73,8 +97,10 @@
             const chip = document.createElement('div');
             chip.className = 'file-chip';
             const sizeMB = (file.size / 1024 / 1024).toFixed(1);
+            const ext = '.' + file.name.split('.').pop().toLowerCase();
+            const icon = ext === '.pdf' ? '📄' : '🖼️';
             chip.innerHTML = `
-                <span class="file-icon">📄</span>
+                <span class="file-icon">${icon}</span>
                 <span>${file.name}</span>
                 <span style="color: var(--text-muted); font-size: 0.78rem;">(${sizeMB}MB)</span>
                 <button class="remove-btn" data-index="${index}" title="移除">
@@ -149,6 +175,12 @@
             // 将所有文件一次性上传
             const formData = new FormData();
             selectedFiles.forEach(file => formData.append('files', file));
+
+            // 添加选择的模型
+            const selectedModel = modelSelect.value;
+            if (selectedModel) {
+                formData.append('model', selectedModel);
+            }
 
             progressBar.style.width = '30%';
             progressText.textContent = `正在识别 ${totalFiles} 个发票...`;

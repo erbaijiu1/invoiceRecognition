@@ -16,12 +16,22 @@
     <!-- Header -->
     <header class="app-header">
         <h1>📄 发票识别系统</h1>
-        <p class="subtitle">上传发票 PDF，智能识别关键字段，一键导出 Excel</p>
+        <p class="subtitle">上传发票 PDF 或图片，智能识别关键字段，一键导出 Excel</p>
         <div class="header-badge">
             <span class="dot"></span>
-            PaddleOCR 引擎就绪
+            AI 视觉引擎就绪
         </div>
     </header>
+
+    <!-- Model Selector -->
+    <section class="model-section">
+        <div class="model-selector">
+            <label for="model-select" class="model-label">识别模型</label>
+            <select id="model-select" class="model-select">
+                <option value="">加载中...</option>
+            </select>
+        </div>
+    </section>
 
     <!-- Upload Section -->
     <section class="upload-section">
@@ -33,9 +43,9 @@
                     <line x1="12" y1="3" x2="12" y2="15"/>
                 </svg>
             </div>
-            <p class="title">拖拽 PDF 文件到此处，或 <span class="hint"><span>点击选择文件</span></span></p>
-            <p class="hint">支持批量上传多个发票 PDF，单文件最大 50MB</p>
-            <input type="file" id="file-input" accept=".pdf" multiple>
+            <p class="title">拖拽文件到此处，或 <span class="hint"><span>点击选择文件</span></span></p>
+            <p class="hint">支持 PDF、JPEG、PNG、BMP、WebP、TIFF 格式，单文件最大 50MB</p>
+            <input type="file" id="file-input" accept=".pdf,.jpg,.jpeg,.png,.bmp,.webp,.tiff,.tif" multiple>
         </div>
 
         <div class="file-list" id="file-list"></div>
