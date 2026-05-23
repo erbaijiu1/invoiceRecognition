@@ -13,10 +13,12 @@ logger = logging.getLogger(__name__)
 # 获取 LLM 环境变量，支持自定义 Base URL 接入大厂或者本地模型
 API_KEY = os.environ.get("OPENAI_API_KEY", "<你的阿里云API_KEY>")
 BASE_URL = os.environ.get("OPENAI_BASE_URL", "https://dashscope.aliyuncs.com/compatible-mode/v1")
-MODEL_NAME = os.environ.get("LLM_MODEL_NAME", "qwen-vl-plus")
+MODEL_NAME = os.environ.get("LLM_MODEL_NAME", "hunyuan-vision")
+HUNYUAN_API_KEY = os.environ.get("HUNYUAN_API_KEY", "")
 
 # 支持的模型列表（前端下拉框使用）
 AVAILABLE_MODELS = [
+    {"id": "hunyuan-vision", "name": "Hunyuan-Vision（腾讯混元视觉）"},
     {"id": "qwen3.7-max", "name": "Qwen3.7-Max（高精度视觉推理）"},
     {"id": "qwen3.6-plus", "name": "Qwen3.6-Plus（新一代主力机器视觉）"},
     {"id": "qwen-vl-plus", "name": "Qwen-VL-Plus（通义千问视觉）"},
@@ -32,11 +34,17 @@ def get_available_models():
     return AVAILABLE_MODELS
 
 
-def get_llm_client():
-    return OpenAI(
-        api_key=API_KEY,
-        base_url=BASE_URL if BASE_URL else None
-    )
+def get_llm_client(model_id):
+    if model_id and model_id.startswith("hunyuan"):
+        return OpenAI(
+            api_key=HUNYUAN_API_KEY,
+            base_url="https://api.hunyuan.cloud.tencent.com/v1"
+        )
+    else:
+        return OpenAI(
+            api_key=API_KEY,
+            base_url=BASE_URL if BASE_URL else None
+        )
 
 
 def encode_image(image):
@@ -104,9 +112,6 @@ def parse_invoice(file_path, model_name=None):
         file_path: 文件路径（PDF 或图片）
         model_name: 指定模型名称，不传则使用环境变量中的默认模型
     """
-    if not API_KEY or API_KEY == "<你的阿里云API_KEY>":
-        return {'error': '未配置正确的 OPENAI_API_KEY 环境变量，无法调用 LLM。'}
-
     ext = os.path.splitext(file_path)[1].lower()
     
     if ext == '.pdf':
@@ -122,9 +127,9 @@ def _parse_image_invoice(image_path, model_name=None):
     base64_image = encode_image_file(image_path)
     mime_type = _get_image_mime_type(image_path)
     
-    client = get_llm_client()
-    prompt = _get_invoice_prompt()
     use_model = model_name or MODEL_NAME
+    client = get_llm_client(use_model)
+    prompt = _get_invoice_prompt()
 
     try:
         response = client.chat.completions.create(
@@ -156,9 +161,9 @@ def _parse_pdf_invoice(pdf_path, model_name=None):
     if not images:
         return {'error': 'PDF 页面为空'}
 
-    client = get_llm_client()
-    prompt = _get_invoice_prompt()
     use_model = model_name or MODEL_NAME
+    client = get_llm_client(use_model)
+    prompt = _get_invoice_prompt()
 
     # 构建多图消息内容（所有页面一起发送）
     content = [{"type": "text", "text": prompt}]
