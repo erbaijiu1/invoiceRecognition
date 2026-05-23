@@ -248,8 +248,8 @@
         resultsSection.classList.add('visible');
         resultCount.textContent = recognitionResults.length;
 
-        const fields = ['发票日期', '发票类型', '发票号码', '数电发票号码',
-                        '供应商名称', '金额', '税额', '有效抵扣税额', '价税合计'];
+        const fields = ['文件名', '发票日期', '发票类型', '发票号码', '数电发票号码',
+                        '供应商名称', '购买方名称', '购买方纳税人识别号', '金额', '税额', '有效抵扣税额', '价税合计'];
         const amountFields = ['金额', '税额', '有效抵扣税额', '价税合计'];
 
         recognitionResults.forEach((result, idx) => {

@@ -99,11 +99,17 @@ def _get_invoice_prompt():
 - "发票日期"（格式为 YYYY-MM-DD）
 - "发票类型"（如：增值税专用发票、增值税普通发票、电子专票、电子普票等）
 - "发票号码"（注：仅提取发票号码或数电发票号码，通常为8位或20位纯数字。绝不是包含字母的18位统一社会信用代码或机器编号，请严格区分！）
-- "供应商名称"（销售方名称）
+- "销售方名称"（请务必找到发票上标有"销售方"字样的栏目，提取其名称部分）
+- "购买方名称"（请务必找到发票上标有"购买方"字样的栏目，提取其名称部分）
+- "购买方纳税人识别号"
 - "金额"（不含税金额，仅提取数字，无逗号）
 - "税额"（仅提取数字，无逗号）
 - "价税合计"（仅提取数字，无逗号）
 - "有效抵扣税额"（如果是专用发票，等于"税额"，否则等于"0"）
+
+【防混淆严厉警告】：
+1. 绝对不要将"购买方"与"销售方"弄反！
+2. 请严格对比图片上的【购买方】和【销售方】标签。标签写的是谁，对应的值就是谁。
 '''
 
 
@@ -177,12 +183,12 @@ def _parse_pdf_invoice(pdf_path, model_name=None):
         return {'error': 'PDF 页面为空'}
 
     # 调试功能：将生成的图片保存到项目根目录下的 debug_images 文件夹中
-    debug_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'debug_images')
-    os.makedirs(debug_dir, exist_ok=True)
-    for i, img in enumerate(images):
-        debug_path = os.path.join(debug_dir, f"debug_page_{i+1}.jpg")
-        img.convert("RGB").save(debug_path, format="JPEG", quality=100, subsampling=0)
-        logger.info(f"已将 PDF 渲染的第 {i+1} 页保存至本地: {debug_path}")
+    # debug_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'debug_images')
+    # os.makedirs(debug_dir, exist_ok=True)
+    # for i, img in enumerate(images):
+    #     debug_path = os.path.join(debug_dir, f"debug_page_{i+1}.jpg")
+    #     img.convert("RGB").save(debug_path, format="JPEG", quality=100, subsampling=0)
+    #     logger.info(f"已将 PDF 渲染的第 {i+1} 页保存至本地: {debug_path}")
 
     use_model = model_name or MODEL_NAME
     client = get_llm_client(use_model)
@@ -309,6 +315,8 @@ def _normalize_keys(result_data):
         '发票类型': ['invoice_type', 'type'],
         '发票号码': ['invoice_number', 'invoice_no', 'number'],
         '供应商名称': ['seller_name', 'seller', '销售方名称'],
+        '购买方名称': ['buyer_name', 'buyer'],
+        '购买方纳税人识别号': ['buyer_tax_id', 'buyer_id'],
         '金额': ['amount', 'total_amount', 'total', '合计金额'],
         '税额': ['tax_amount', 'tax', 'tax_total', '合计税额'],
         '有效抵扣税额': ['deductible_tax', 'valid_tax'],
