@@ -172,35 +172,52 @@
         progressText.textContent = '正在上传文件并识别...';
 
         try {
-            // 将所有文件一次性上传
-            const formData = new FormData();
-            selectedFiles.forEach(file => formData.append('files', file));
-
-            // 添加选择的模型
             const selectedModel = modelSelect.value;
-            if (selectedModel) {
-                formData.append('model', selectedModel);
+
+            // 逐个上传并识别，避免多文件一次性上传导致请求超时
+            progressBar.style.width = '0%';
+            
+            for (let i = 0; i < totalFiles; i++) {
+                const file = selectedFiles[i];
+                progressText.textContent = `正在识别第 ${i + 1} 个发票 (共 ${totalFiles} 个)...`;
+                
+                const formData = new FormData();
+                formData.append('files', file);
+                if (selectedModel) {
+                    formData.append('model', selectedModel);
+                }
+
+                try {
+                    const response = await fetch('/api/upload', {
+                        method: 'POST',
+                        body: formData
+                    });
+
+                    if (!response.ok) {
+                        recognitionResults.push({
+                            '文件名': file.name,
+                            'error': `服务器错误: ${response.status}`
+                        });
+                    } else {
+                        const data = await response.json();
+                        if (data.results && data.results.length > 0) {
+                            recognitionResults.push(data.results[0]);
+                        }
+                    }
+                } catch (fetchErr) {
+                    recognitionResults.push({
+                        '文件名': file.name,
+                        'error': `网络请求遇到问题: ${fetchErr.message}`
+                    });
+                }
+                
+                // 更新进度条
+                progressBar.style.width = `${Math.round(((i + 1) / totalFiles) * 100)}%`;
+                progressCount.textContent = `${i + 1} / ${totalFiles}`;
             }
 
-            progressBar.style.width = '30%';
-            progressText.textContent = `正在识别 ${totalFiles} 个发票...`;
-
-            const response = await fetch('/api/upload', {
-                method: 'POST',
-                body: formData
-            });
-
-            if (!response.ok) {
-                throw new Error(`服务器错误: ${response.status}`);
-            }
-
-            const data = await response.json();
-
-            progressBar.style.width = '100%';
-            progressCount.textContent = `${totalFiles} / ${totalFiles}`;
             progressText.textContent = '识别完成！';
 
-            recognitionResults = data.results || [];
             renderResults();
 
             setTimeout(() => {

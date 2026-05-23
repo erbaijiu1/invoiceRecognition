@@ -17,13 +17,10 @@ MODEL_NAME = os.environ.get("LLM_MODEL_NAME", "qwen-vl-plus")
 
 # 支持的模型列表（前端下拉框使用）
 AVAILABLE_MODELS = [
+    {"id": "qwen3.7-max", "name": "Qwen3.7-Max（高精度视觉推理）"},
     {"id": "qwen3.6-plus", "name": "Qwen3.6-Plus（新一代主力机器视觉）"},
-    {"id": "qwen-vl-max", "name": "Qwen-VL-Max（通义千问视觉旗舰）"},
     {"id": "qwen-vl-plus", "name": "Qwen-VL-Plus（通义千问视觉）"},
-    # {"id": "qwen-vl-ocr", "name": "Qwen-VL-OCR（OCR专用）"},
-    # {"id": "qwen2.5-vl-72b-instruct", "name": "Qwen2.5-VL-72B"},
-    # {"id": "qwen2.5-vl-32b-instruct", "name": "Qwen2.5-VL-32B"},
-    # {"id": "qwen2.5-vl-7b-instruct", "name": "Qwen2.5-VL-7B"},
+    {"id": "qwen-vl-max", "name": "Qwen-VL-Max（通义千问视觉旗舰）"},
 ]
 
 # 支持的图片格式
