@@ -17,14 +17,13 @@ MODEL_NAME = os.environ.get("LLM_MODEL_NAME", "qwen-vl-plus")
 
 # 支持的模型列表（前端下拉框使用）
 AVAILABLE_MODELS = [
-    {"id": "qwen-vl-plus", "name": "Qwen-VL-Plus（通义千问视觉）"},
-    {"id": "qwen-vl-max", "name": "Qwen-VL-Max（通义千问视觉旗舰）"},
-    {"id": "qwen-vl-ocr", "name": "Qwen-VL-OCR（OCR专用）"},
-    {"id": "qwen3.7-max", "name": "Qwen3.7-Max（新一代旗舰机器视觉）"},
     {"id": "qwen3.6-plus", "name": "Qwen3.6-Plus（新一代主力机器视觉）"},
-    {"id": "qwen2.5-vl-72b-instruct", "name": "Qwen2.5-VL-72B"},
-    {"id": "qwen2.5-vl-32b-instruct", "name": "Qwen2.5-VL-32B"},
-    {"id": "qwen2.5-vl-7b-instruct", "name": "Qwen2.5-VL-7B"},
+    {"id": "qwen-vl-max", "name": "Qwen-VL-Max（通义千问视觉旗舰）"},
+    {"id": "qwen-vl-plus", "name": "Qwen-VL-Plus（通义千问视觉）"},
+    # {"id": "qwen-vl-ocr", "name": "Qwen-VL-OCR（OCR专用）"},
+    # {"id": "qwen2.5-vl-72b-instruct", "name": "Qwen2.5-VL-72B"},
+    # {"id": "qwen2.5-vl-32b-instruct", "name": "Qwen2.5-VL-32B"},
+    # {"id": "qwen2.5-vl-7b-instruct", "name": "Qwen2.5-VL-7B"},
 ]
 
 # 支持的图片格式
@@ -73,8 +72,7 @@ def _build_image_content(base64_str, mime_type='image/jpeg'):
     return {
         "type": "image_url",
         "image_url": {
-            "url": f"data:{mime_type};base64,{base64_str}",
-            "detail": "high"
+            "url": f"data:{mime_type};base64,{base64_str}"
         }
     }
 
