@@ -5,7 +5,8 @@ import base64
 import logging
 import re
 from PIL import Image
-from pdf2image import convert_from_path
+import fitz  # PyMuPDF
+import io
 from openai import OpenAI
 
 logger = logging.getLogger(__name__)
@@ -51,7 +52,8 @@ def encode_image(image):
     """将 PIL Image 转为 Base64 字符串"""
     buffered = io.BytesIO()
     image = image.convert("RGB")
-    image.save(buffered, format="JPEG")
+    # 使用高画质保存，防止发票小字（号码等）因压缩而失真
+    image.save(buffered, format="JPEG", quality=98, subsampling=0)
     return base64.b64encode(buffered.getvalue()).decode('utf-8')
 
 
@@ -96,7 +98,7 @@ def _get_invoice_prompt():
 请返回包含以下固定键名的 JSON：
 - "发票日期"（格式为 YYYY-MM-DD）
 - "发票类型"（如：增值税专用发票、增值税普通发票、电子专票、电子普票等）
-- "发票号码"（或数电发票号码）
+- "发票号码"（注：仅提取发票号码或数电发票号码，通常为8位或20位纯数字。绝不是包含字母的18位统一社会信用代码或机器编号，请严格区分！）
 - "供应商名称"（销售方名称）
 - "金额"（不含税金额，仅提取数字，无逗号）
 - "税额"（仅提取数字，无逗号）
@@ -154,12 +156,33 @@ def _parse_image_invoice(image_path, model_name=None):
 def _parse_pdf_invoice(pdf_path, model_name=None):
     """解析 PDF 格式的发票（支持多页，所有页面发送给模型）"""
     try:
-        images = convert_from_path(pdf_path, dpi=200)
+        # 使用 PyMuPDF (fitz) 来代替 pdf2image，避免丢掉字体或渲染不清晰
+        doc = fitz.open(pdf_path)
+        images = []
+        for page_num in range(len(doc)):
+            page = doc.load_page(page_num)
+            # 设置高分辨率 (300 DPI 相当于 zoom=300/72 ≈ 4.16)
+            zoom_x = 4.0
+            zoom_y = 4.0
+            mat = fitz.Matrix(zoom_x, zoom_y)
+            pix = page.get_pixmap(matrix=mat, alpha=False)
+            
+            # 将 fitz pixmap 转换为 PIL Image
+            img = Image.open(io.BytesIO(pix.tobytes("jpeg")))
+            images.append(img)
     except Exception as e:
         return {'error': f'PDF 转图片失败: {str(e)}'}
 
     if not images:
         return {'error': 'PDF 页面为空'}
+
+    # 调试功能：将生成的图片保存到项目根目录下的 debug_images 文件夹中
+    debug_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'debug_images')
+    os.makedirs(debug_dir, exist_ok=True)
+    for i, img in enumerate(images):
+        debug_path = os.path.join(debug_dir, f"debug_page_{i+1}.jpg")
+        img.convert("RGB").save(debug_path, format="JPEG", quality=100, subsampling=0)
+        logger.info(f"已将 PDF 渲染的第 {i+1} 页保存至本地: {debug_path}")
 
     use_model = model_name or MODEL_NAME
     client = get_llm_client(use_model)
