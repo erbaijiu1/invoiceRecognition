@@ -64,7 +64,9 @@ def get_ledger():
                 or_(
                     InvoiceRecord.filename.like(f"%{query}%"),
                     InvoiceRecord.invoice_number.like(f"%{query}%"),
-                    InvoiceRecord.digital_invoice_number.like(f"%{query}%")
+                    InvoiceRecord.digital_invoice_number.like(f"%{query}%"),
+                    InvoiceRecord.seller_name.like(f"%{query}%"),
+                    InvoiceRecord.buyer_name.like(f"%{query}%")
                 )
             ).order_by(InvoiceRecord.recognition_time.desc()).all()
         else:
@@ -216,7 +218,7 @@ def download_excel():
     ws.title = '发票识别结果'
 
     # 表头
-    headers = ['文件名', '发票日期', '发票类型', '发票号码', '数电发票号码',
+    headers = ['状态', '文件名', '发票日期', '发票类型', '发票号码', '数电发票号码',
                '供应商名称', '购买方名称', '购买方纳税人识别号',
                '金额', '税额', '有效抵扣税额', '价税合计']
 
@@ -251,7 +253,12 @@ def download_excel():
             continue
 
         for col_idx, header in enumerate(headers, 1):
-            value = result.get(header, '')
+            if header == '状态':
+                is_duplicate = result.get('is_duplicate', False)
+                value = '疑似重复' if is_duplicate else '正常'
+            else:
+                value = result.get(header, '')
+                
             cell = ws.cell(row=row_idx, column=col_idx, value=value)
             cell.font = data_font
             cell.border = thin_border
