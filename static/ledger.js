@@ -1,4 +1,4 @@
-// ===== Tabs & Ledger Logic =====
+﻿// ===== Tabs & Ledger Logic =====
 document.addEventListener('DOMContentLoaded', () => {
     const tabUpload = document.getElementById('tab-upload');
     const tabLedger = document.getElementById('tab-ledger');
@@ -36,7 +36,7 @@ document.addEventListener('DOMContentLoaded', () => {
         tbody.innerHTML = '<tr><td colspan="9" style="text-align: center;">加载中...</td></tr>';
         
         try {
-            const res = await fetch('/api/ledger?query=' + encodeURIComponent(query));
+            const res = await fetch('/invoice/api/ledger?query=' + encodeURIComponent(query));
             const data = await res.json();
             
             if (!res.ok) throw new Error(data.error || 'Server error');

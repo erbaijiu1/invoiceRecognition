@@ -31,7 +31,7 @@
     // ===== Load Models =====
     async function loadModels() {
         try {
-            const res = await fetch('/api/models');
+            const res = await fetch('/invoice/api/models');
             const data = await res.json();
             modelSelect.innerHTML = '';
             (data.models || []).forEach(m => {
@@ -188,7 +188,7 @@
                 }
 
                 try {
-                    const response = await fetch('/api/upload', {
+                    const response = await fetch('/invoice/api/upload', {
                         method: 'POST',
                         body: formData
                     });
@@ -312,7 +312,7 @@
         showToast('正在生成 Excel...', 'info', 2000);
 
         try {
-            const response = await fetch('/api/download', {
+            const response = await fetch('/invoice/api/download', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ results: recognitionResults })

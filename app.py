@@ -1,4 +1,4 @@
-import os
+﻿import os
 import io
 import sys
 import uuid
@@ -27,7 +27,7 @@ if sys.platform == 'win32':
 logging.basicConfig(level=logging.INFO, format='%(asctime)s [%(levelname)s] %(message)s')
 logger = logging.getLogger(__name__)
 
-app = Flask(__name__, static_folder='static', static_url_path='')
+app = Flask(__name__, static_folder='static', static_url_path='/invoice')
 
 # 初始化数据库
 init_db()
@@ -39,6 +39,11 @@ app.config['MAX_CONTENT_LENGTH'] = 50 * 1024 * 1024  # 50MB
 
 
 @app.route('/')
+def redirect_root():
+    from flask import redirect
+    return redirect('/invoice/')
+
+@app.route('/invoice/')
 def index():
     """返回前端页面"""
     return send_from_directory('static', 'index.html')
@@ -48,12 +53,12 @@ def index():
 SUPPORTED_EXTENSIONS = {'.pdf'} | SUPPORTED_IMAGE_EXTENSIONS
 
 
-@app.route('/api/models', methods=['GET'])
+@app.route('/invoice/api/models', methods=['GET'])
 def list_models():
     """返回可用模型列表"""
     return jsonify({'models': get_available_models()})
 
-@app.route('/api/ledger', methods=['GET'])
+@app.route('/invoice/api/ledger', methods=['GET'])
 def get_ledger():
     """查询台账历史记录"""
     query = request.args.get('query', '').strip()
@@ -95,7 +100,7 @@ def get_ledger():
         db.close()
 
 
-@app.route('/api/upload', methods=['POST'])
+@app.route('/invoice/api/upload', methods=['POST'])
 def upload_invoice():
     """上传并识别发票（支持 PDF 和图片格式）"""
     if 'files' not in request.files:
@@ -203,7 +208,7 @@ def upload_invoice():
     return jsonify({'results': results})
 
 
-@app.route('/api/download', methods=['POST'])
+@app.route('/invoice/api/download', methods=['POST'])
 def download_excel():
     """将识别结果导出为 Excel"""
     data = request.get_json()
