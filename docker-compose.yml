@@ -1,4 +1,18 @@
 services:
+  db:
+    image: mysql:8
+    container_name: invoice-db
+    environment:
+      MYSQL_ROOT_PASSWORD: my_root_password
+      MYSQL_DATABASE: invoice_db
+      MYSQL_USER: invoice_user
+      MYSQL_PASSWORD: invoice_password
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+    restart: unless-stopped
+
   invoice-ocr:
     build: .
     container_name: invoice-ocr
@@ -13,8 +27,11 @@ services:
       - OPENAI_API_KEY=${OPENAI_API_KEY}
       - OPENAI_BASE_URL=${OPENAI_BASE_URL:-https://api.openai.com/v1}
       - LLM_MODEL_NAME=${LLM_MODEL_NAME:-hunyuan-vision}
+      - DATABASE_URL=mysql+pymysql://invoice_user:invoice_password@db:3306/invoice_db
     env_file:
       - .env
+    depends_on:
+      - db
     restart: unless-stopped
     # 如果需要 GPU 加速 PaddleOCR，取消下面注释
     # deploy:
@@ -24,3 +41,6 @@ services:
     #         - driver: nvidia
     #           count: 1
     #           capabilities: [gpu]
+
+volumes:
+  mysql_data:

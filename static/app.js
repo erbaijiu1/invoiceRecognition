@@ -1,4 +1,4 @@
-/**
+﻿/**
  * 发票识别系统 - 前端交互逻辑
  */
 (function () {
@@ -261,9 +261,18 @@
             tdIndex.textContent = idx + 1;
             tr.appendChild(tdIndex);
 
+            const tdStatus = document.createElement('td');
+            if (result.is_duplicate) {
+                let historyTitles = result.history.map(h => (h.filename + ' @ ' + h.recognition_time)).join('\n');
+                tdStatus.innerHTML = `<span class='status-badge warning' title='历史重复记录：\n${historyTitles}' style='color: orange; font-weight: bold; cursor: help;'>⚠️ 疑似重复</span>`;
+            } else {
+                tdStatus.innerHTML = `<span class='status-badge success' style='color: green;'>✅ 正常</span>`;
+            }
+            tr.appendChild(tdStatus);
+
             if (result.error) {
                 const tdError = document.createElement('td');
-                tdError.colSpan = fields.length;
+                tdError.colSpan = fields.length + 1;
                 tdError.className = 'error-cell';
                 tdError.textContent = `${result['文件名'] || ''} — ${result.error}`;
                 tr.appendChild(tdError);

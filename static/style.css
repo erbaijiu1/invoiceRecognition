@@ -190,7 +190,7 @@ body::before {
     position: relative;
     border: 2px dashed var(--border-glass);
     border-radius: var(--radius-xl);
-    padding: 3.5rem 2rem;
+    padding: 1.5rem 1rem;
     text-align: center;
     cursor: pointer;
     transition: var(--transition);
@@ -222,9 +222,9 @@ body::before {
 .upload-zone .icon {
     position: relative;
     z-index: 1;
-    width: 64px;
-    height: 64px;
-    margin: 0 auto 1.2rem;
+    width: 48px;
+    height: 48px;
+    margin: 0 auto 0.5rem;
     background: var(--accent-glow);
     border-radius: 50%;
     display: flex;
@@ -239,8 +239,8 @@ body::before {
 }
 
 .upload-zone .icon svg {
-    width: 28px;
-    height: 28px;
+    width: 24px;
+    height: 24px;
     color: var(--accent-primary);
 }
 
@@ -672,7 +672,7 @@ body::before {
     }
 
     .upload-zone {
-        padding: 2.5rem 1.5rem;
+        padding: 1rem;
     }
 
     .action-bar {
@@ -706,3 +706,36 @@ body::before {
 .empty-state p {
     font-size: 0.95rem;
 }
+.tabs-container {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 20px;
+    border-bottom: 1px solid var(--border-color);
+    padding-bottom: 10px;
+}
+.tab-btn {
+    background: none;
+    border: none;
+    padding: 10px 20px;
+    font-size: 1rem;
+    cursor: pointer;
+    font-weight: 500;
+    color: var(--text-muted);
+    border-radius: var(--radius-md) var(--radius-md) 0 0;
+    transition: all 0.2s;
+}
+.tab-btn:hover {
+    color: var(--text-color);
+}
+.tab-btn.active {
+    color: var(--primary-color);
+    border-bottom: 2px solid var(--primary-color);
+    background: rgba(37, 99, 235, 0.05);
+}
+.status-badge {
+    padding: 4px 8px;
+    border-radius: 12px;
+    font-size: 0.85rem;
+}
+.status-badge.warning { background: #fff3cd; }
+.status-badge.success { background: #d1e7dd; }

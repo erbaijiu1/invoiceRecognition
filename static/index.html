@@ -33,7 +33,15 @@
         </div>
     </section>
 
-    <!-- Upload Section -->
+    <!-- Tabs -->
+    <div class="tabs-container">
+        <button class="tab-btn active" id="tab-upload">📁 上传识别</button>
+        <button class="tab-btn" id="tab-ledger">📚 历史台账</button>
+    </div>
+
+    <!-- Upload View -->
+    <div id="view-upload" class="view-section active">
+        <!-- Upload Section -->
     <section class="upload-section">
         <div class="upload-zone" id="upload-zone">
             <div class="icon">
@@ -106,6 +114,7 @@
                 <thead>
                     <tr>
                         <th>#</th>
+                        <th>状态</th>
                         <th>文件名</th>
                         <th>发票日期</th>
                         <th>发票类型</th>
@@ -125,11 +134,47 @@
             </table>
         </div>
     </section>
+    </div> <!-- End Upload View -->
+
+    <!-- Ledger View -->
+    <div id="view-ledger" class="view-section" style="display: none;">
+        <section class="results-section" style="margin-top: 20px;">
+            <div class="results-header" style="justify-content: space-between; display: flex;">
+                <h2>历史台账 <span class="count-badge" id="ledger-count">0</span></h2>
+                <div>
+                    <input type="text" id="ledger-search" placeholder="发票号码 / 归属公司" style="padding: 8px 12px; border: 1px solid var(--border-color); border-radius: var(--radius-md);">
+                    <button class="btn btn-primary" id="btn-search-ledger" style="padding: 8px 16px;">搜索</button>
+                    <button class="btn btn-secondary" id="btn-export-ledger" style="padding: 8px 16px;">全部导出</button>
+                </div>
+            </div>
+            <div class="table-wrapper">
+                <table class="results-table" id="ledger-table">
+                    <thead>
+                        <tr>
+                            <th>序号</th>
+                            <th>识别时间</th>
+                            <th>文件名</th>
+                            <th>发票类型</th>
+                            <th>发票号码</th>
+                            <th>购买方</th>
+                            <th>销售方</th>
+                            <th>金额</th>
+                            <th>价税合计</th>
+                        </tr>
+                    </thead>
+                    <tbody id="ledger-body">
+                    </tbody>
+                </table>
+            </div>
+        </section>
+    </div>
+
 </div>
 
 <!-- Toast Container -->
 <div class="toast-container" id="toast-container"></div>
 
 <script src="/app.js"></script>
+<script src="/ledger.js"></script>
 </body>
 </html>

@@ -1,4 +1,4 @@
-FROM python:3.10.20
+FROM python:3.10-slim
 
 # ��װϵͳ������Poppler��PDFתͼƬ���裩����������
 RUN apt-get update && apt-get install -y --no-install-recommends \
