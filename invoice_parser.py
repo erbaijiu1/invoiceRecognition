@@ -122,12 +122,37 @@ def parse_invoice(file_path, model_name=None):
     """
     ext = os.path.splitext(file_path)[1].lower()
     
-    if ext == '.pdf':
-        return _parse_pdf_invoice(file_path, model_name)
-    elif ext in SUPPORTED_IMAGE_EXTENSIONS:
-        return _parse_image_invoice(file_path, model_name)
-    else:
+    if ext != '.pdf' and ext not in SUPPORTED_IMAGE_EXTENSIONS:
         return {'error': f'不支持的文件格式: {ext}，仅支持 PDF 和常见图片格式'}
+
+    max_attempts = 4  # 1次正常请求 + 3次重试
+    last_error = None
+    
+    for attempt in range(max_attempts):
+        if attempt > 0:
+            logger.info(f"由于发票号码长度等异常，正在进行第 {attempt} 次重试...")
+            
+        if ext == '.pdf':
+            result = _parse_pdf_invoice(file_path, model_name)
+        else:
+            result = _parse_image_invoice(file_path, model_name)
+            
+        # 如果模型内部报错，或者 JSON 无法解析，也进行重试
+        if 'error' in result:
+            last_error = result['error']
+            logger.warning(f"第 {attempt + 1} 次尝试解析出错: {last_error}")
+            continue
+            
+        invoice_num = str(result.get('发票号码', '')).strip()
+        
+        # 检查发票号码长度是否为 8位 或 20位
+        if len(invoice_num) in (8, 20):
+            return result
+            
+        last_error = f"发票号码长度异常 (当前: {len(invoice_num)}位，期望8或20位，提取值为: '{invoice_num}')"
+        logger.warning(f"第 {attempt + 1} 次尝试警告: {last_error}")
+        
+    return {'error': f'识别发票失败（发票号码长度非8或20位等异常），已重试3次仍未解决，请人工检查发票。最后提示: {last_error}'}
 
 
 def _parse_image_invoice(image_path, model_name=None):
