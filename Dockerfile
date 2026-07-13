@@ -1,7 +1,9 @@
-﻿FROM python:3.10-slim
+FROM python:3.10-slim
 
 # 锟斤拷装系统锟斤拷锟斤拷锟斤拷Poppler锟斤拷PDF转图片锟斤拷锟借）锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷
-RUN apt-get update && apt-get install -y --no-install-recommends \
+RUN sed -i 's/deb.debian.org/mirrors.cloud.tencent.com/g' /etc/apt/sources.list.d/debian.sources 2>/dev/null || true \
+    && sed -i 's/deb.debian.org/mirrors.cloud.tencent.com/g' /etc/apt/sources.list 2>/dev/null || true \
+    && apt-get update && apt-get install -y --no-install-recommends \
     poppler-utils \
     && rm -rf /var/lib/apt/lists/*
 

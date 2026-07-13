@@ -1,4 +1,4 @@
-﻿import os
+import os
 import io
 import sys
 import uuid
@@ -62,10 +62,14 @@ def list_models():
 def get_ledger():
     """查询台账历史记录"""
     query = request.args.get('query', '').strip()
+    user_id_str = request.headers.get("X-User-Id", "0")
+    user_id = int(user_id_str) if user_id_str.isdigit() else 0
+
     db = SessionLocal()
     try:
+        base_query = db.query(InvoiceRecord).filter(InvoiceRecord.user_id == user_id)
         if query:
-            records = db.query(InvoiceRecord).filter(
+            records = base_query.filter(
                 or_(
                     InvoiceRecord.filename.like(f"%{query}%"),
                     InvoiceRecord.invoice_number.like(f"%{query}%"),
@@ -75,7 +79,7 @@ def get_ledger():
                 )
             ).order_by(InvoiceRecord.recognition_time.desc()).all()
         else:
-            records = db.query(InvoiceRecord).order_by(InvoiceRecord.recognition_time.desc()).limit(100).all()
+            records = base_query.order_by(InvoiceRecord.recognition_time.desc()).limit(100).all()
         
         result = []
         for r in records:
@@ -113,6 +117,9 @@ def upload_invoice():
     # 获取前端选择的模型
     model_name = request.form.get('model', None)
 
+    user_id_str = request.headers.get("X-User-Id", "0")
+    user_id = int(user_id_str) if user_id_str.isdigit() else 0
+
     results = []
     for file in files:
         ext = os.path.splitext(file.filename)[1].lower()
@@ -145,6 +152,7 @@ def upload_invoice():
                 if inv_num:
                     # 查询历史记录
                     existing_records = db.query(InvoiceRecord).filter(
+                        InvoiceRecord.user_id == user_id,
                         or_(
                             InvoiceRecord.invoice_number == inv_num,
                             InvoiceRecord.digital_invoice_number == inv_num
@@ -169,6 +177,7 @@ def upload_invoice():
 
                     # 插入新记录
                     new_record = InvoiceRecord(
+                        user_id=user_id,
                         filename=file.filename,
                         invoice_number=result.get('发票号码', ''),
                         invoice_date=result.get('发票日期', ''),
@@ -253,8 +262,9 @@ def download_excel():
 
     for row_idx, result in enumerate(results, 2):
         if 'error' in result and result.get('error'):
-            ws.cell(row=row_idx, column=1, value=result.get('文件名', ''))
-            ws.cell(row=row_idx, column=2, value=f"错误: {result['error']}")
+            ws.cell(row=row_idx, column=1, value='失败')
+            ws.cell(row=row_idx, column=2, value=result.get('文件名', ''))
+            ws.cell(row=row_idx, column=3, value=f"错误: {result['error']}")
             continue
 
         for col_idx, header in enumerate(headers, 1):

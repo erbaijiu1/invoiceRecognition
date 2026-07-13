@@ -30,6 +30,7 @@ class InvoiceRecord(Base):
     __tablename__ = "invoices"
 
     id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, index=True, default=0)
     filename = Column(String(255), index=True)
     invoice_number = Column(String(100), index=True)
     invoice_date = Column(String(50))

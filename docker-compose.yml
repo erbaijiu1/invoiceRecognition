@@ -1,16 +1,4 @@
 services:
-  db:
-    image: mysql:8
-    container_name: invoice-db
-    environment:
-      MYSQL_ROOT_PASSWORD: Gmcc@123
-      MYSQL_DATABASE: invoice_db
-    ports:
-      - "3306:3306"
-    volumes:
-      - mysql_data:/var/lib/mysql
-    restart: unless-stopped
-
   invoice-ocr:
     build: .
     container_name: invoice-ocr
@@ -27,14 +15,14 @@ services:
       - LLM_MODEL_NAME=${LLM_MODEL_NAME:-hunyuan-vision}
       - DB_USER=root
       - DB_PASSWORD=Gmcc@123
-      - DB_HOST=db
+      - DB_HOST=host.docker.internal
       - DB_PORT=3306
       - DB_NAME=invoice_db
     env_file:
       - .env
-    depends_on:
-      - db
     restart: unless-stopped
+    networks:
+      - web
     # 如果需要 GPU 加速 PaddleOCR，取消下面注释
     # deploy:
     #   resources:
@@ -43,6 +31,3 @@ services:
     #         - driver: nvidia
     #           count: 1
     #           capabilities: [gpu]
-
-volumes:
-  mysql_data:

@@ -1,4 +1,4 @@
-﻿/**
+/**
  * 发票识别系统 - 前端交互逻辑
  */
 (function () {
@@ -262,7 +262,9 @@
             tr.appendChild(tdIndex);
 
             const tdStatus = document.createElement('td');
-            if (result.is_duplicate) {
+            if (result.error) {
+                tdStatus.innerHTML = `<span class='status-badge error' style='color: red;'>❌ 失败</span>`;
+            } else if (result.is_duplicate) {
                 let historyTitles = result.history.map(h => (h.filename + ' @ ' + h.recognition_time)).join('\n');
                 tdStatus.innerHTML = `<span class='status-badge warning' title='历史重复记录：\n${historyTitles}' style='color: orange; font-weight: bold; cursor: help;'>⚠️ 疑似重复</span>`;
             } else {
@@ -352,5 +354,43 @@
         updateButtonStates();
         showToast('已清空所有数据', 'info', 2000);
     });
+
+    // ===== SSO User Management =====
+    async function fetchUserInfo() {
+        try {
+            const res = await fetch('/sso_auth/api/auth/me');
+            if (res.ok) {
+                const user = await res.json();
+                document.getElementById('user-profile').style.display = 'flex';
+                document.getElementById('user-name').textContent = user.nickname || user.id;
+                
+                const avatarImg = document.getElementById('user-avatar');
+                if (user.avatar_url) {
+                    avatarImg.src = user.avatar_url;
+                } else {
+                    // Default avatar
+                    avatarImg.src = 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="%2394a3b8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>';
+                }
+            }
+        } catch (e) {
+            console.error('Failed to fetch user info:', e);
+        }
+    }
+
+    const btnLogout = document.getElementById('btn-logout');
+    if (btnLogout) {
+        btnLogout.addEventListener('click', async () => {
+            try {
+                await fetch('/sso_auth/api/auth/logout', { method: 'POST' });
+                // Reload page will trigger Nginx 401 redirect to login
+                window.location.reload();
+            } catch (e) {
+                console.error('Logout failed:', e);
+            }
+        });
+    }
+
+    // Initialize user info
+    fetchUserInfo();
 
 })();
