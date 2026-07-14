@@ -1,48 +1,27 @@
 services:
-  db:
-    image: mysql:8
-    container_name: invoice-db
-    environment:
-      MYSQL_ROOT_PASSWORD: Gmcc@123
-      MYSQL_DATABASE: invoice_db
-    ports:
-      - "3306:3306"
-    volumes:
-      - mysql_data:/var/lib/mysql
-    restart: unless-stopped
-
-  invoice-ocr:
-    build: .
-    container_name: invoice-ocr
-    ports:
-      - "8999:8999"
-    volumes:
-      # 挂载当前目录到容器内，避免修改代码需重新构建
-      - .:/app
-    environment:
-      - FLASK_ENV=development
-      - FLASK_DEBUG=1
-      - OPENAI_API_KEY=${OPENAI_API_KEY}
-      - OPENAI_BASE_URL=${OPENAI_BASE_URL:-https://api.openai.com/v1}
-      - LLM_MODEL_NAME=${LLM_MODEL_NAME:-hunyuan-vision}
-      - DB_USER=root
-      - DB_PASSWORD=Gmcc@123
-      - DB_HOST=db
-      - DB_PORT=3306
-      - DB_NAME=invoice_db
+  invoice_ocr:
+    image: invoice_ocr:latest
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: invoice_ocr
+    restart: always
     env_file:
       - .env
+    networks:
+      - web
+    dns:
+      - 223.5.5.5
+      - 114.114.114.114
     depends_on:
-      - db
-    restart: unless-stopped
-    # 如果需要 GPU 加速 PaddleOCR，取消下面注释
-    # deploy:
-    #   resources:
-    #     reservations:
-    #       devices:
-    #         - driver: nvidia
-    #           count: 1
-    #           capabilities: [gpu]
-
-volumes:
-  mysql_data:
+      mysql_db:
+        condition: service_healthy
+    environment:
+      - DB_HOST=mysql_db
+      - DB_PORT=3306
+      - DB_PASSWORD=Gmcc@123
+      - DB_USER=root
+      - DB_NAME=invoice_db
+      - LLM_MODEL_NAME=hunyuan-vision
+    volumes:
+      - ../logs/invoice:/app/logs
