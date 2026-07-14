@@ -62,6 +62,8 @@ def list_models():
 def get_ledger():
     """查询台账历史记录"""
     query = request.args.get('query', '').strip()
+    page = int(request.args.get('page', 1))
+    page_size = int(request.args.get('page_size', 100))
     user_id_str = request.headers.get("X-User-Id", "0")
     user_id = int(user_id_str) if user_id_str.isdigit() else 0
 
@@ -69,7 +71,7 @@ def get_ledger():
     try:
         base_query = db.query(InvoiceRecord).filter(InvoiceRecord.user_id == user_id)
         if query:
-            records = base_query.filter(
+            base_query = base_query.filter(
                 or_(
                     InvoiceRecord.filename.like(f"%{query}%"),
                     InvoiceRecord.invoice_number.like(f"%{query}%"),
@@ -77,9 +79,10 @@ def get_ledger():
                     InvoiceRecord.seller_name.like(f"%{query}%"),
                     InvoiceRecord.buyer_name.like(f"%{query}%")
                 )
-            ).order_by(InvoiceRecord.recognition_time.desc()).all()
-        else:
-            records = base_query.order_by(InvoiceRecord.recognition_time.desc()).limit(100).all()
+            )
+        
+        total_count = base_query.count()
+        records = base_query.order_by(InvoiceRecord.recognition_time.desc()).offset((page - 1) * page_size).limit(page_size).all()
         
         result = []
         for r in records:
@@ -96,7 +99,12 @@ def get_ledger():
                 "total_amount": r.total_amount,
                 "recognition_time": r.recognition_time.strftime('%Y-%m-%d %H:%M:%S') if r.recognition_time else ''
             })
-        return jsonify({'results': result})
+        return jsonify({
+            'results': result,
+            'total': total_count,
+            'page': page,
+            'page_size': page_size
+        })
     except Exception as e:
         logger.error(f"台账查询失败: {e}")
         return jsonify({'error': str(e)}), 500

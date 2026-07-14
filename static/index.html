@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -10,187 +11,212 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/invoice/style.css">
 </head>
+
 <body>
 
-<div class="app-container">
-    <!-- Header -->
-    <header class="app-header">
-        <div class="header-content">
-            <h1>📄 发票识别系统</h1>
-            <p class="subtitle">上传发票 PDF 或图片，智能识别关键字段，一键导出 Excel</p>
-            <div class="header-badge">
-                <span class="dot"></span>
-                AI 视觉引擎就绪
-            </div>
-        </div>
-        <div class="user-profile" id="user-profile" style="display: none;">
-            <div class="user-info">
-                <img src="" alt="avatar" id="user-avatar" class="user-avatar">
-                <span class="user-name" id="user-name"></span>
-            </div>
-            <button class="btn-logout-link" id="btn-logout" title="退出登录">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
-                    <polyline points="16 17 21 12 16 7"></polyline>
-                    <line x1="21" y1="12" x2="9" y2="12"></line>
-                </svg>
-                退出
-            </button>
-        </div>
-    </header>
-
-    <!-- Model Selector -->
-    <section class="model-section" style="display: none;">
-        <div class="model-selector">
-            <label for="model-select" class="model-label">识别模型</label>
-            <select id="model-select" class="model-select">
-                <option value="">加载中...</option>
-            </select>
-        </div>
-    </section>
-
-    <!-- Tabs -->
-    <div class="tabs-container">
-        <button class="tab-btn active" id="tab-upload">📁 上传识别</button>
-        <button class="tab-btn" id="tab-ledger">📚 历史台账</button>
-    </div>
-
-    <!-- Upload View -->
-    <div id="view-upload" class="view-section active">
-        <!-- Upload Section -->
-    <section class="upload-section">
-        <div class="upload-zone" id="upload-zone">
-            <div class="icon">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-                    <polyline points="17 8 12 3 7 8"/>
-                    <line x1="12" y1="3" x2="12" y2="15"/>
-                </svg>
-            </div>
-            <p class="title">拖拽文件到此处，或 <span class="hint"><span>点击选择文件</span></span></p>
-            <p class="hint">支持 PDF、JPEG、PNG、BMP、WebP、TIFF 格式，单文件最大 50MB</p>
-            <input type="file" id="file-input" accept=".pdf,.jpg,.jpeg,.png,.bmp,.webp,.tiff,.tif" multiple>
-        </div>
-
-        <div class="file-list" id="file-list"></div>
-
-        <div class="action-bar">
-            <button class="btn btn-primary" id="btn-recognize" disabled>
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <circle cx="11" cy="11" r="8"/>
-                    <path d="M21 21l-4.35-4.35"/>
-                </svg>
-                开始识别
-            </button>
-            <button class="btn btn-secondary" id="btn-download" disabled>
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-                    <polyline points="7 10 12 15 17 10"/>
-                    <line x1="12" y1="15" x2="12" y2="3"/>
-                </svg>
-                下载 Excel
-            </button>
-            <button class="btn btn-secondary" id="btn-clear" disabled>
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <polyline points="3 6 5 6 21 6"/>
-                    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
-                </svg>
-                清空
-            </button>
-        </div>
-    </section>
-
-    <!-- Progress -->
-    <section class="progress-section" id="progress-section">
-        <div class="progress-card">
-            <div class="progress-header">
-                <span class="label">正在识别发票...</span>
-                <span class="count" id="progress-count">0 / 0</span>
-            </div>
-            <div class="progress-bar-track">
-                <div class="progress-bar-fill" id="progress-bar"></div>
-            </div>
-            <div class="progress-status">
-                <div class="spinner"></div>
-                <span id="progress-text">准备中...</span>
-            </div>
-        </div>
-    </section>
-
-    <!-- Results -->
-    <section class="results-section" id="results-section">
-        <div class="results-header">
-            <h2>
-                识别结果
-                <span class="count-badge" id="result-count">0</span>
-            </h2>
-        </div>
-        <div class="table-wrapper">
-            <table class="results-table" id="results-table">
-                <thead>
-                    <tr>
-                        <th>#</th>
-                        <th>状态</th>
-                        <th>文件名</th>
-                        <th>发票日期</th>
-                        <th>发票类型</th>
-                        <th>发票号码</th>
-                        <th>数电发票号码</th>
-                        <th>供应商名称</th>
-                        <th>购买方名称</th>
-                        <th>购买方纳税人识别号</th>
-                        <th>金额</th>
-                        <th>税额</th>
-                        <th>有效抵扣税额</th>
-                        <th>价税合计</th>
-                    </tr>
-                </thead>
-                <tbody id="results-body">
-                </tbody>
-            </table>
-        </div>
-    </section>
-    </div> <!-- End Upload View -->
-
-    <!-- Ledger View -->
-    <div id="view-ledger" class="view-section" style="display: none;">
-        <section class="results-section visible" style="margin-top: 20px;">
-            <div class="results-header" style="justify-content: space-between; display: flex;">
-                <h2>历史台账 <span class="count-badge" id="ledger-count">0</span></h2>
-                <div>
-                    <input type="text" id="ledger-search" placeholder="发票号码 / 归属公司" style="padding: 8px 12px; border: 1px solid var(--border-color); border-radius: var(--radius-md);">
-                    <button class="btn btn-primary" id="btn-search-ledger" style="padding: 8px 16px;">搜索</button>
-                    <button class="btn btn-secondary" id="btn-export-ledger" style="padding: 8px 16px;">全部导出</button>
+    <div class="app-container">
+        <!-- Header -->
+        <header class="app-header">
+            <div class="header-content">
+                <h1>📄 发票识别系统</h1>
+                <p class="subtitle">上传发票 PDF 或图片，智能识别关键字段，一键导出 Excel</p>
+                <div class="header-badge">
+                    <span class="dot"></span>
+                    AI 视觉引擎就绪
                 </div>
             </div>
-            <div class="table-wrapper">
-                <table class="results-table" id="ledger-table">
-                    <thead>
-                        <tr>
-                            <th>序号</th>
-                            <th>识别时间</th>
-                            <th>文件名</th>
-                            <th>发票类型</th>
-                            <th>发票号码</th>
-                            <th>购买方</th>
-                            <th>销售方</th>
-                            <th>金额</th>
-                            <th>价税合计</th>
-                        </tr>
-                    </thead>
-                    <tbody id="ledger-body">
-                    </tbody>
-                </table>
+            <div class="user-profile" id="user-profile" style="display: none;">
+                <div class="user-info">
+                    <img src="" alt="avatar" id="user-avatar" class="user-avatar">
+                    <span class="user-name" id="user-name"></span>
+                </div>
+                <button class="btn-logout-link" id="btn-logout" title="退出登录">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                        stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+                        <polyline points="16 17 21 12 16 7"></polyline>
+                        <line x1="21" y1="12" x2="9" y2="12"></line>
+                    </svg>
+                    退出
+                </button>
+            </div>
+        </header>
+
+        <!-- Model Selector -->
+        <section class="model-section" style="display: none;">
+            <div class="model-selector">
+                <label for="model-select" class="model-label">识别模型</label>
+                <select id="model-select" class="model-select">
+                    <option value="">加载中...</option>
+                </select>
             </div>
         </section>
+
+        <!-- Tabs -->
+        <div class="tabs-container">
+            <button class="tab-btn active" id="tab-upload">📁 上传识别</button>
+            <button class="tab-btn" id="tab-ledger">📚 历史台账</button>
+        </div>
+
+        <!-- Upload View -->
+        <div id="view-upload" class="view-section active">
+            <!-- Upload Section -->
+            <section class="upload-section">
+                <div class="upload-zone" id="upload-zone">
+                    <div class="icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                            stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                            <polyline points="17 8 12 3 7 8" />
+                            <line x1="12" y1="3" x2="12" y2="15" />
+                        </svg>
+                    </div>
+                    <p class="title">拖拽文件到此处，或 <span class="hint"><span>点击选择文件</span></span></p>
+                    <p class="hint">支持 PDF、JPEG、PNG、BMP、WebP、TIFF 格式，单文件最大 50MB</p>
+                    <input type="file" id="file-input" accept=".pdf,.jpg,.jpeg,.png,.bmp,.webp,.tiff,.tif" multiple>
+                </div>
+
+                <div class="file-list" id="file-list"></div>
+
+                <div class="action-bar">
+                    <button class="btn btn-primary" id="btn-recognize" disabled>
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                            stroke-linecap="round" stroke-linejoin="round">
+                            <circle cx="11" cy="11" r="8" />
+                            <path d="M21 21l-4.35-4.35" />
+                        </svg>
+                        开始识别
+                    </button>
+                    <button class="btn btn-secondary" id="btn-download" disabled>
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                            stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                            <polyline points="7 10 12 15 17 10" />
+                            <line x1="12" y1="15" x2="12" y2="3" />
+                        </svg>
+                        下载 Excel
+                    </button>
+                    <button class="btn btn-secondary" id="btn-clear" disabled>
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                            stroke-linecap="round" stroke-linejoin="round">
+                            <polyline points="3 6 5 6 21 6" />
+                            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                        </svg>
+                        清空
+                    </button>
+                </div>
+            </section>
+
+            <!-- Progress -->
+            <section class="progress-section" id="progress-section">
+                <div class="progress-card">
+                    <div class="progress-header">
+                        <span class="label">正在识别发票...</span>
+                        <span class="count" id="progress-count">0 / 0</span>
+                    </div>
+                    <div class="progress-bar-track">
+                        <div class="progress-bar-fill" id="progress-bar"></div>
+                    </div>
+                    <div class="progress-status">
+                        <div class="spinner"></div>
+                        <span id="progress-text">准备中...</span>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Results -->
+            <section class="results-section" id="results-section">
+                <div class="results-header">
+                    <h2>
+                        识别结果
+                        <span class="count-badge" id="result-count">0</span>
+                    </h2>
+                </div>
+                <div class="table-wrapper">
+                    <table class="results-table" id="results-table">
+                        <thead>
+                            <tr>
+                                <th>#</th>
+                                <th>状态</th>
+                                <th>文件名</th>
+                                <th>发票日期</th>
+                                <th>发票类型</th>
+                                <th>发票号码</th>
+                                <th>数电发票号码</th>
+                                <th>供应商名称</th>
+                                <th>购买方名称</th>
+                                <th>购买方纳税人识别号</th>
+                                <th>金额</th>
+                                <th>税额</th>
+                                <th>有效抵扣税额</th>
+                                <th>价税合计</th>
+                            </tr>
+                        </thead>
+                        <tbody id="results-body">
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+        </div> <!-- End Upload View -->
+
+        <!-- Ledger View -->
+        <div id="view-ledger" class="view-section" style="display: none;">
+            <section class="results-section visible" style="margin-top: 20px;">
+                <div class="results-header" style="justify-content: space-between; display: flex;">
+                    <h2>历史台账 <span class="count-badge" id="ledger-count">0</span></h2>
+                    <div>
+                        <input type="text" id="ledger-search" placeholder="发票号码 / 归属公司"
+                            style="padding: 8px 12px; border: 1px solid var(--border-color); border-radius: var(--radius-md);">
+                        <button class="btn btn-primary" id="btn-search-ledger" style="padding: 8px 16px;">搜索</button>
+                        <button class="btn btn-secondary" id="btn-export-ledger"
+                            style="padding: 8px 16px;">全部导出</button>
+                    </div>
+                </div>
+                <div class="table-wrapper">
+                    <table class="results-table" id="ledger-table">
+                        <thead>
+                            <tr>
+                                <th>序号</th>
+                                <th>识别时间</th>
+                                <th>文件名</th>
+                                <th>发票类型</th>
+                                <th>发票号码</th>
+                                <th>购买方</th>
+                                <th>销售方</th>
+                                <th>金额</th>
+                                <th>价税合计</th>
+                            </tr>
+                        </thead>
+                        <tbody id="ledger-body">
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="pagination-container" id="ledger-pagination" style="display: none;">
+                    <div class="pagination-info">
+                        共 <span id="page-total">0</span> 条记录，当前第 <span id="page-current">1</span> / <span
+                            id="page-count">1</span> 页
+                    </div>
+                    <div class="pagination-controls">
+                        <button class="btn btn-secondary btn-sm" id="btn-prev-page">上一页</button>
+                        <select id="page-size-select" class="page-size-select">
+                            <option value="10">10 条/页</option>
+                            <option value="50">50 条/页</option>
+                            <option value="100" selected>100 条/页</option>
+                        </select>
+                        <button class="btn btn-secondary btn-sm" id="btn-next-page">下一页</button>
+                    </div>
+                </div>
+            </section>
+        </div>
+
     </div>
 
-</div>
+    <!-- Toast Container -->
+    <div class="toast-container" id="toast-container"></div>
 
-<!-- Toast Container -->
-<div class="toast-container" id="toast-container"></div>
-
-<script src="/invoice/app.js"></script>
-<script src="/invoice/ledger.js"></script>
+    <script src="/invoice/app.js"></script>
+    <script src="/invoice/ledger.js"></script>
 </body>
+
 </html>

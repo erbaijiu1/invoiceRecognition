@@ -1,4 +1,4 @@
-﻿// ===== Tabs & Ledger Logic =====
+// ===== Tabs & Ledger Logic =====
 document.addEventListener('DOMContentLoaded', () => {
     const tabUpload = document.getElementById('tab-upload');
     const tabLedger = document.getElementById('tab-ledger');
@@ -26,9 +26,44 @@ document.addEventListener('DOMContentLoaded', () => {
     const searchInput = document.getElementById('ledger-search');
     const btnExportLedger = document.getElementById('btn-export-ledger');
 
-    btnSearchLedger.addEventListener('click', () => loadLedger(searchInput.value));
+    let currentPage = 1;
+    let pageSize = 100;
+
+    btnSearchLedger.addEventListener('click', () => {
+        currentPage = 1;
+        loadLedger(searchInput.value);
+    });
     searchInput.addEventListener('keypress', (e) => {
-        if (e.key === 'Enter') loadLedger(searchInput.value);
+        if (e.key === 'Enter') {
+            currentPage = 1;
+            loadLedger(searchInput.value);
+        }
+    });
+
+    const btnPrevPage = document.getElementById('btn-prev-page');
+    const btnNextPage = document.getElementById('btn-next-page');
+    const pageSizeSelect = document.getElementById('page-size-select');
+    const paginationContainer = document.getElementById('ledger-pagination');
+
+    btnPrevPage.addEventListener('click', () => {
+        if (currentPage > 1) {
+            currentPage--;
+            loadLedger(searchInput.value);
+        }
+    });
+
+    btnNextPage.addEventListener('click', () => {
+        const totalPages = parseInt(document.getElementById('page-count').textContent) || 1;
+        if (currentPage < totalPages) {
+            currentPage++;
+            loadLedger(searchInput.value);
+        }
+    });
+
+    pageSizeSelect.addEventListener('change', (e) => {
+        pageSize = parseInt(e.target.value);
+        currentPage = 1;
+        loadLedger(searchInput.value);
     });
 
     async function loadLedger(query = '') {
@@ -36,12 +71,27 @@ document.addEventListener('DOMContentLoaded', () => {
         tbody.innerHTML = '<tr><td colspan="9" style="text-align: center;">加载中...</td></tr>';
         
         try {
-            const res = await fetch('/invoice/api/ledger?query=' + encodeURIComponent(query));
+            const res = await fetch(`/invoice/api/ledger?query=${encodeURIComponent(query)}&page=${currentPage}&page_size=${pageSize}`);
             const data = await res.json();
             
             if (!res.ok) throw new Error(data.error || 'Server error');
             
-            document.getElementById('ledger-count').textContent = data.results.length;
+            document.getElementById('ledger-count').textContent = data.total || data.results.length;
+            
+            // Update pagination info
+            if (data.total !== undefined) {
+                const totalPages = Math.ceil(data.total / pageSize) || 1;
+                document.getElementById('page-total').textContent = data.total;
+                document.getElementById('page-current').textContent = data.page;
+                document.getElementById('page-count').textContent = totalPages;
+                
+                btnPrevPage.disabled = data.page <= 1;
+                btnNextPage.disabled = data.page >= totalPages;
+                
+                paginationContainer.style.display = 'flex';
+            } else {
+                paginationContainer.style.display = 'none';
+            }
             tbody.innerHTML = '';
             
             if (data.results.length === 0) {
@@ -51,8 +101,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
             data.results.forEach((r, idx) => {
                 const tr = document.createElement('tr');
+                const rowNum = (currentPage - 1) * pageSize + idx + 1;
                 tr.innerHTML = `
-                    <td class="row-index">${idx + 1}</td>
+                    <td class="row-index">${rowNum}</td>
                     <td>${r.recognition_time}</td>
                     <td>${r.filename || ''}</td>
                     <td>${r.invoice_type || ''}</td>
