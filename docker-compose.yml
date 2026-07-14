@@ -15,7 +15,7 @@ services:
       - LLM_MODEL_NAME=${LLM_MODEL_NAME:-hunyuan-vision}
       - DB_USER=root
       - DB_PASSWORD=Gmcc@123
-      - DB_HOST=host.docker.internal
+      - DB_HOST=${DB_HOST:-host.docker.internal}
       - DB_PORT=3306
       - DB_NAME=invoice_db
     env_file:
