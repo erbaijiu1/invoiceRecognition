@@ -19,6 +19,7 @@ HUNYUAN_API_KEY = os.environ.get("HUNYUAN_API_KEY", "")
 
 # 支持的模型列表（前端下拉框使用）
 AVAILABLE_MODELS = [
+    {"id": "qwen3.7-plus-2026-05-26", "name": "qwen3.7-plus-2026-05-26"},
     {"id": "hunyuan-vision", "name": "Hunyuan-Vision（腾讯混元视觉）"},
     {"id": "qwen3.7-max", "name": "Qwen3.7-Max（高精度视觉推理）"},
     {"id": "qwen3.6-plus", "name": "Qwen3.6-Plus（新一代主力机器视觉）"},
